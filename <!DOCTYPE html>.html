@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meta Recovery Bureau | Cyber Case Desk</title>
+  <!-- Tailwind CSS & React Core CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.10/babel.min.js"></script>
+
+  <!-- Firebase Cloud Sync -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <style>
+    body {
+      background-color: #07070a;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Aapka Realtime Firebase URL Connected
+    const FIREBASE_DB_URL = "https://cyber-portal-302aa-default-rtdb.firebaseio.com/";
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp({ databaseURL: FIREBASE_DB_URL });
+    }
+    const db = firebase.database();
+
+    // ================= 3D CYBER ANIMATION (CANVAS) =================
+    function Cyber3DCanvas() {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let animationId;
+
+        let width = canvas.width = 320;
+        let height = canvas.height = 240;
+
+        const size = 60;
+        const nodes = [
+          [-size, -size, -size], [size, -size, -size], [size, size, -size], [-size, size, -size],
+          [-size, -size, size], [size, -size, size], [size, size, size], [-size, size, size]
+        ];
+
+        const edges = [
+          [0,1], [1,2], [2,3], [3,0],
+          [4,5], [5,6], [6,7], [7,4],
+          [0,4], [1,5], [2,6], [3,7]
+        ];
+
+        const particles = Array.from({ length: 40 }, () => ({
+          x: (Math.random() - 0.5) * 240,
+          y: (Math.random() - 0.5) * 240,
+          z: (Math.random() - 0.5) * 240,
+          size: Math.random() * 2 + 1,
+          color: Math.random() > 0.5 ? '#ec4899' : '#a855f7'
+        }));
+
+        let rotX = 0.4;
+        let rotY = 0.6;
+        let targetX = 0;
+        let targetY = 0;
+
+        const onMove = (clientX, clientY) => {
+          const rect = canvas.getBoundingClientRect();
+          targetX = ((clientX - rect.left) / width - 0.5) * 2;
+          targetY = ((clientY - rect.top) / height - 0.5) * 2;
+        };
+
+        const handleMouseMove = (e) => onMove(e.clientX, e.clientY);
+        const handleTouchMove = (e) => {
+          if (e.touches && e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+        const render = () => {
+          ctx.clearRect(0, 0, width, height);
+
+          rotY += 0.008 + (targetX * 0.04);
+          rotX += 0.005 + (targetY * 0.04);
+
+          const cx = width / 2;
+          const cy = height / 2;
+          const fov = 280;
+
+          const project = (x, y, z) => {
+            let x1 = x * Math.cos(rotY) - z * Math.sin(rotY);
+            let z1 = z * Math.cos(rotY) + x * Math.sin(rotY);
+            let y2 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
+            let z2 = z1 * Math.cos(rotX) + y * Math.sin(rotX);
+            const scale = fov / (fov + z2 + 160);
+            return { px: cx + x1 * scale, py: cy + y2 * scale, scale };
+          };
+
+          particles.forEach(p => {
+            const pt = project(p.x, p.y, p.z);
+            ctx.beginPath();
+            ctx.arc(pt.px, pt.py, p.size * pt.scale, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+          });
+
+          edges.forEach(([i, j]) => {
+            const p1 = project(nodes[i][0], nodes[i][1], nodes[i][2]);
+            const p2 = project(nodes[j][0], nodes[j][1], nodes[j][2]);
+
+            ctx.beginPath();
+            ctx.moveTo(p1.px, p1.py);
+            ctx.lineTo(p2.px, p2.py);
+            ctx.strokeStyle = '#d946ef';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          });
+
+          const center = project(0, 0, 0);
+          ctx.beginPath();
+          ctx.arc(center.px, center.py, 8 * center.scale, 0, Math.PI * 2);
+          ctx.fillStyle = '#06b6d4';
+          ctx.fill();
+
+          animationId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+          cancelAnimationFrame(animationId);
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('touchmove', handleTouchMove);
+        };
+      }, []);
+
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+          <canvas ref={canvasRef} style={{ width: '320px', height: '240px' }} />
+        </div>
+      );
+    }
+
+    // ================= MAIN COMPONENT =================
+    function App() {
+      const [currentPage, setCurrentPage] = useState('client');
+      const [adminPinInput, setAdminPinInput] = useState('');
+      const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+      const [pinError, setPinError] = useState('');
+      const MASTER_PIN = "9988";
+
+      const WHATSAPP_CHANNEL_URL = "https://chat.whatsapp.com/LIzPUhcczTLCe1COqgcdbP";
+
+      // CLOUD CASES STATE
+      const [cases, setCases] = useState([]);
+      const [isSyncing, setIsSyncing] = useState(true);
+
+      // Realtime Cloud Listener
+      useEffect(() => {
+        const casesRef = db.ref('recovery_cases');
+        casesRef.on('value', (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            const loadedCases = Object.keys(data).map(key => ({
+              id: key,
+              ...data[key]
+            }));
+            loadedCases.reverse();
+            setCases(loadedCases);
+          } else {
+            setCases([]);
+          }
+          setIsSyncing(false);
+        });
+
+        return () => casesRef.off();
+      }, []);
+
+      const [step, setStep] = useState(1);
+      const [issueType, setIssueType] = useState('');
+      const [username, setUsername] = useState('');
+      const [phone, setPhone] = useState('');
+      const [reason, setReason] = useState('');
+      const [screenshotPreview, setScreenshotPreview] = useState(null);
+      const [generatedToken, setGeneratedToken] = useState('');
+      const [isSubmitting, setIsSubmitting] = useState(false);
+
+      const [searchToken, setSearchToken] = useState('');
+      const [trackedCase, setTrackedCase] = useState(null);
+      const [activeImage, setActiveImage] = useState(null);
+
+      // Fast Screenshot Compressor (Taaki cloud me 1 second me upload ho)
+      const handleScreenshot = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const maxDim = 800;
+              let w = img.width;
+              let h = img.height;
+              if (w > h && w > maxDim) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else if (h > maxDim) {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+              setScreenshotPreview(compressedBase64);
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      // Realtime Cloud Submission
+      const handleClientSubmit = (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+
+        const token = 'RCV-' + Math.floor(100000 + Math.random() * 900000);
+        const newCase = {
+          token,
+          issueType,
+          username: username.replace('@', '').trim(),
+          phone: phone.trim(),
+          reason: reason.trim(),
+          screenshot: screenshotPreview || '',
+          status: 'Case Submitted & Assigned',
+          stage: 'inbox',
+          handler: '@daniishhh_01',
+          createdAt: Date.now()
+        };
+
+        db.ref('recovery_cases').push(newCase)
+          .then(() => {
+            setGeneratedToken(token);
+            setIsSubmitting(false);
+            setStep(3);
+          })
+          .catch((err) => {
+            alert("Error saving: " + err.message);
+            setIsSubmitting(false);
+          });
+      };
+
+      // Track case live
+      const handleTrackCase = () => {
+        const item = cases.find(c => c.token.trim().toUpperCase() === searchToken.trim().toUpperCase());
+        setTrackedCase(item || 'NOT_FOUND');
+      };
+
+      // Accept Case (Admin 1 -> Admin 2)
+      const acceptCase = (item) => {
+        if (item.id) {
+          db.ref(`recovery_cases/${item.id}`).update({
+            stage: 'active',
+            status: 'Case Accepted & Under Review'
+          });
+        }
+      };
+
+      // Change Live Status (Admin 2)
+      const updateCaseStatus = (item, newStatus) => {
+        if (item.id) {
+          db.ref(`recovery_cases/${item.id}`).update({
+            status: newStatus
+          });
+        }
+      };
+
+      const handlePinUnlock = (e) => {
+        e.preventDefault();
+        if (adminPinInput === MASTER_PIN) {
+          setIsAdminUnlocked(true);
+          setPinError('');
+        } else {
+          setPinError('Galat PIN! Access Denied.');
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-[#07070a] text-white flex flex-col justify-between font-sans">
+          
+          {/* NAVBAR */}
+          <header className="border-b border-zinc-800 bg-zinc-950 px-5 py-3.5 flex justify-between items-center sticky top-0 z-40">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentPage('client')}>
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-600 flex items-center justify-center font-bold text-sm shadow">
+                🛡️
+              </div>
+              <div>
+                <h1 className="font-black text-base bg-gradient-to-r from-pink-400 to-indigo-400 bg-clip-text text-transparent">
+                  CYBER BUREAU
+                </h1>
+                <p className="text-[9px] text-zinc-400 uppercase tracking-widest font-bold">Meta Recovery Portal</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-1 rounded-xl text-xs">
+              <button 
+                onClick={() => setCurrentPage('client')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${currentPage === 'client' ? 'bg-pink-600 text-white' : 'text-zinc-400'}`}
+              >
+                User Page
+              </button>
+              <button 
+                onClick={() => setCurrentPage('admin_leads')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${currentPage === 'admin_leads' ? 'bg-purple-600 text-white' : 'text-zinc-400'}`}
+              >
+                Admin 1
+                {cases.filter(c => c.stage === 'inbox').length > 0 && (
+                  <span className="bg-pink-500 text-[10px] px-1.5 rounded-full font-black animate-pulse">
+                    {cases.filter(c => c.stage === 'inbox').length}
+                  </span>
+                )}
+              </button>
+              <button 
+                onClick={() => setCurrentPage('admin_pipeline')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition ${currentPage === 'admin_pipeline' ? 'bg-indigo-600 text-white' : 'text-zinc-400'}`}
+              >
+                Admin 2
+              </button>
+            </div>
+          </header>
+
+          {/* CLIENT VIEW */}
+          {currentPage === 'client' && (
+            <main className="max-w-2xl mx-auto px-4 py-6 w-full flex-1">
+              <div className="text-center space-y-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-pink-500/10 border border-pink-500/20 text-pink-400">
+                  ⚡ 24/7 Verified Meta Account Restoration
+                </span>
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight pt-1">
+                  Recover Suspended & <br />
+                  <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
+                    Disabled Instagram IDs
+                  </span>
+                </h2>
+                <p className="text-zinc-400 text-xs md:text-sm max-w-md mx-auto">
+                  Automated token tracking, direct appeals, and verified case handlers.
+                </p>
+              </div>
+
+              <Cyber3DCanvas />
+
+              {/* FOUNDER & WHATSAPP CHANNEL CARDS */}
+              <div className="max-w-xs mx-auto mb-6 space-y-2.5">
+                <a
+                  href="https://instagram.com/_mitu_111_"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-pink-500 transition-all flex items-center justify-center gap-3 shadow-lg group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-purple-600 flex items-center justify-center text-lg font-bold shrink-0">
+                    📸
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] uppercase font-black text-pink-400 tracking-wider">Founder</span>
+                      <span className="text-pink-400 text-xs font-bold">✓</span>
+                    </div>
+                    <p className="font-bold text-sm text-white group-hover:text-pink-300 transition">@_mitu_111_</p>
+                  </div>
+                </a>
+
+                <a
+                  href={WHATSAPP_CHANNEL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/50 hover:border-emerald-400 transition-all flex items-center justify-center gap-3 shadow-lg group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-600 flex items-center justify-center text-lg font-bold shrink-0">
+                    💬
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[10px] uppercase font-black text-emerald-400 tracking-wider block">Official Community</span>
+                    <p className="font-bold text-xs text-white group-hover:text-emerald-300 transition">
+                      Join WhatsApp Channel ➔
+                    </p>
+                  </div>
+                </a>
+              </div>
+
+              {/* Form */}
+              <div className="max-w-md mx-auto bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+                {step === 1 && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold">Step 1: Choose Account Issue</h3>
+                      <p className="text-xs text-zinc-400">Select what is showing on your screen:</p>
+                    </div>
+                    <div className="space-y-2.5">
+                      {[
+                        { title: 'Suspended Account', note: '180 days countdown appeal error' },
+                        { title: 'Disabled Account', note: 'Community guidelines / Terms violation' },
+                        { title: 'Hacked / 2FA Lost', note: 'Phone/Email changed or authenticator lost' }
+                      ].map(item => (
+                        <button
+                          key={item.title}
+                          onClick={() => { setIssueType(item.title); setStep(2); }}
+                          className="w-full text-left p-3.5 rounded-xl bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/60 hover:border-pink-500 transition flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="font-bold text-sm text-white">{item.title}</div>
+                            <div className="text-xs text-zinc-400">{item.note}</div>
+                          </div>
+                          <span className="text-pink-400 text-sm">➔</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <form onSubmit={handleClientSubmit} className="space-y-3.5">
+                    <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+                      <div>
+                        <h3 className="text-sm font-bold">Step 2: Enter Details</h3>
+                        <p className="text-xs text-pink-400 font-semibold">{issueType}</p>
+                      </div>
+                      <button type="button" onClick={() => setStep(1)} className="text-xs text-zinc-400 underline">Change</button>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400 block mb-1">Instagram Username (@)</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. your_instagram_id"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white outline-none focus:border-pink-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400 block mb-1">WhatsApp Number</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="+91 98765 43210"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white outline-none focus:border-pink-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400 block mb-1">Problem Description</label>
+                      <textarea
+                        rows={2}
+                        required
+                        placeholder="Briefly describe what happened..."
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white outline-none focus:border-pink-500 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-zinc-400 block mb-1">Upload Screenshot</label>
+                      <div className="border border-dashed border-zinc-700 hover:border-pink-500 rounded-xl p-3 text-center cursor-pointer bg-zinc-800/30">
+                        <input type="file" accept="image/*" required onChange={handleScreenshot} className="hidden" id="screenshot-file" />
+                        <label htmlFor="screenshot-file" className="cursor-pointer block text-xs text-zinc-400">
+                          {screenshotPreview ? (
+                            <span className="text-pink-400 font-bold">Screenshot Attached ✓ (Tap to change)</span>
+                          ) : (
+                            <span>📁 Tap to attach screenshot</span>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-3 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 font-bold rounded-xl text-sm shadow-lg hover:opacity-95 transition"
+                    >
+                      {isSubmitting ? "Uploading to Cloud..." : "Submit Case & Get Token ➔"}
+                    </button>
+                  </form>
+                )}
+
+                {step === 3 && (
+                  <div className="text-center py-3 space-y-3.5">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
+                      ✓
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Case Successfully Logged!</h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">Your case is now live in our system.</p>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-zinc-800 border border-zinc-700 max-w-xs mx-auto">
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 block tracking-widest mb-1">Your Tracking Token</span>
+                      <span className="text-2xl font-mono font-black text-pink-400 tracking-wider">{generatedToken}</span>
+                    </div>
+
+                    <div className="max-w-xs mx-auto p-3 rounded-2xl bg-purple-950/40 border border-purple-500/50 text-left flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider block">Assigned Specialist</span>
+                        <span className="text-xs text-zinc-300 font-medium">Case handled by:</span>
+                      </div>
+                      <a 
+                        href="https://instagram.com/daniishhh_01" 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/30 border border-purple-500/60 text-white font-bold text-xs flex items-center gap-1"
+                      >
+                        📸 @daniishhh_01
+                      </a>
+                    </div>
+
+                    <div className="max-w-xs mx-auto p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/50 text-left flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">Live Updates & Proofs</span>
+                        <span className="text-xs text-zinc-300 font-medium">Join our community</span>
+                      </div>
+                      <a 
+                        href={WHATSAPP_CHANNEL_URL} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 border border-emerald-400 text-white font-bold text-xs flex items-center gap-1 hover:bg-emerald-500 transition"
+                      >
+                        💬 Join Group
+                      </a>
+                    </div>
+
+                    <p className="text-xs text-zinc-500">You will receive an update on WhatsApp shortly.</p>
+
+                    <button
+                      onClick={() => { setStep(1); setScreenshotPreview(null); setUsername(''); setPhone(''); setReason(''); }}
+                      className="text-xs text-zinc-400 underline block mx-auto pt-1"
+                    >
+                      Submit another account
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Tracker */}
+              <div className="max-w-md mx-auto mt-6 p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2.5">
+                  🔍 Check Case Status
+                </h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter Token (e.g. RCV-481902)"
+                    value={searchToken}
+                    onChange={(e) => setSearchToken(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-xs uppercase font-mono tracking-wider outline-none"
+                  />
+                  <button
+                    onClick={handleTrackCase}
+                    className="px-4 py-2 bg-purple-600 text-xs font-bold rounded-xl"
+                  >
+                    Track
+                  </button>
+                </div>
+
+                {trackedCase === 'NOT_FOUND' && (
+                  <p className="mt-2 text-xs text-red-400 bg-red-500/10 p-2 rounded-lg">
+                    ⚠️ Token not found. Please verify.
+                  </p>
+                )}
+
+                {trackedCase && trackedCase !== 'NOT_FOUND' && (
+                  <div className="mt-3 p-3 rounded-xl bg-zinc-800 border border-zinc-700 space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Account: <b className="text-white">@{trackedCase.username}</b></span>
+                      <span className="font-mono text-pink-400 font-bold">{trackedCase.token}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-zinc-700">
+                      <span className="text-zinc-400">Handled By:</span>
+                      <a href="https://instagram.com/daniishhh_01" target="_blank" rel="noreferrer" className="text-purple-400 font-bold">
+                        @daniishhh_01
+                      </a>
+                    </div>
+                    <div className="pt-1">
+                      <span className="text-[10px] text-zinc-400 uppercase font-bold block">Status:</span>
+                      <span className="text-xs font-bold text-emerald-400">● {trackedCase.status}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </main>
+          )}
+
+          {/* ADMIN PASSCODE */}
+          {currentPage.startsWith('admin') && !isAdminUnlocked && (
+            <div className="max-w-xs mx-auto my-16 p-6 bg-zinc-900 border border-zinc-800 rounded-3xl text-center space-y-3.5">
+              <div className="text-3xl">🔒</div>
+              <h3 className="text-base font-bold">Admin Portal Locked</h3>
+              <p className="text-xs text-zinc-400">Enter master PIN to access (PIN: 9988)</p>
+              <form onSubmit={handlePinUnlock} className="space-y-3">
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="••••"
+                  value={adminPinInput}
+                  onChange={(e) => setAdminPinInput(e.target.value)}
+                  className="w-full text-center text-xl tracking-widest font-mono py-2 rounded-xl bg-zinc-800 border border-zinc-700 outline-none"
+                />
+                {pinError && <p className="text-xs text-red-400">{pinError}</p>}
+                <button type="submit" className="w-full py-2 bg-pink-600 rounded-xl font-bold text-xs uppercase tracking-wider">
+                  Unlock Portal ➔
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ADMIN 1: LEADS INBOX */}
+          {currentPage === 'admin_leads' && isAdminUnlocked && (
+            <div className="max-w-5xl mx-auto px-4 py-6 w-full flex-1">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-zinc-800">
+                <div>
+                  <h2 className="text-lg font-black text-pink-400 flex items-center gap-2">
+                    Admin 1: Live Cloud Leads
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  </h2>
+                  <p className="text-xs text-zinc-400">Cases yahan bina page refresh kiye 1 second me aayenge.</p>
+                </div>
+                <button 
+                  onClick={() => setCurrentPage('admin_pipeline')}
+                  className="px-3 py-1.5 bg-indigo-600 text-xs font-bold rounded-xl"
+                >
+                  Pipeline Workboard ➔
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+                <table className="w-full text-left text-xs text-zinc-300">
+                  <thead className="bg-zinc-800 text-zinc-400 uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3">Token</th>
+                      <th className="p-3">Username</th>
+                      <th className="p-3">Issue</th>
+                      <th className="p-3">Handler</th>
+                      <th className="p-3">Evidence</th>
+                      <th className="p-3">WhatsApp</th>
+                      <th className="p-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {cases.filter(c => c.stage === 'inbox').length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-zinc-500">
+                          {isSyncing ? "Syncing with cloud..." : "Abhi koi naya case queue me nahi hai."}
+                        </td>
+                      </tr>
+                    ) : (
+                      cases.filter(c => c.stage === 'inbox').map((item) => (
+                        <tr key={item.token} className="hover:bg-zinc-800/40">
+                          <td className="p-3 font-mono font-bold text-pink-400">{item.token}</td>
+                          <td className="p-3 font-bold text-white">@{item.username}</td>
+                          <td className="p-3 text-zinc-300">{item.issueType}</td>
+                          <td className="p-3 text-purple-400">{item.handler}</td>
+                          <td className="p-3">
+                            {item.screenshot ? (
+                              <button 
+                                onClick={() => setActiveImage(item.screenshot)} 
+                                className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-blue-400 font-semibold text-[11px]"
+                              >
+                                View SS 👁️
+                              </button>
+                            ) : (
+                              <span className="text-zinc-600">No SS</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <a
+                              href={`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}?text=Hello%20@${item.username},%20we%20reviewed%20your%20Instagram%20case%20(${item.token}).`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold text-[11px]"
+                            >
+                              Chat 💬
+                            </a>
+                          </td>
+                          <td className="p-3 flex gap-1 justify-center">
+                            <button
+                              onClick={() => acceptCase(item)}
+                              className="px-2.5 py-1 bg-blue-600 text-white rounded font-bold"
+                            >
+                              Accept ➔
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN 2: ACTIVE WORKBOARD */}
+          {currentPage === 'admin_pipeline' && isAdminUnlocked && (
+            <div className="max-w-5xl mx-auto px-4 py-6 w-full flex-1">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-zinc-800">
+                <div>
+                  <h2 className="text-lg font-black text-indigo-400">Admin 2: Active Recovery Workboard</h2>
+                  <p className="text-xs text-zinc-400">Yahan status change karo, client ke token tracker me live dikhega.</p>
+                </div>
+                <button 
+                  onClick={() => setCurrentPage('admin_leads')}
+                  className="px-3.5 py-1.5 bg-zinc-800 text-xs font-bold rounded-xl"
+                >
+                  ⬅ Back to Leads
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {cases.filter(c => c.stage === 'active').map((item) => (
+                  <div key={item.token} className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2.5">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-mono text-xs text-pink-400 font-bold">{item.token}</span>
+                        <h4 className="text-sm font-bold text-white">@{item.username}</h4>
+                      </div>
+                      <span className="text-[10px] text-zinc-400">{item.issueType}</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">Live Status for Client</label>
+                      <select
+                        value={item.status}
+                        onChange={(e) => updateCaseStatus(item, e.target.value)}
+                        className="w-full bg-zinc-800 border border-zinc-700 text-xs rounded-xl p-2 text-zinc-200 outline-none"
+                      >
+                        <option value="Case Accepted & Under Review">Case Accepted & Under Review</option>
+                        <option value="ID Verification Document Sent">ID Verification Document Sent</option>
+                        <option value="Meta Appeal Submitted">Meta Appeal Submitted</option>
+                        <option value="Waiting for Meta Specialist">Waiting for Meta Specialist</option>
+                        <option value="Account Successfully Restored">Account Successfully Restored (Done ✓)</option>
+                        <option value="Case Closed / Unrecoverable">Case Closed / Unrecoverable</option>
+                      </select>
+                    </div>
+
+                    <div className="pt-2 border-t border-zinc-800 flex justify-between items-center text-xs">
+                      {item.screenshot && (
+                        <button onClick={() => setActiveImage(item.screenshot)} className="text-blue-400 underline">
+                          View Screenshot 👁️
+                        </button>
+                      )}
+                      <a href={`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-400 font-bold">
+                        WhatsApp ➔
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SCREENSHOT MODAL */}
+          {activeImage && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-zinc-900 border border-zinc-700 p-4 rounded-2xl max-w-sm w-full">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-zinc-400">Error Screenshot</span>
+                  <button onClick={() => setActiveImage(null)} className="text-xs text-zinc-400 hover:text-white font-bold">✕ Close</button>
+                </div>
+                <img src={activeImage} alt="Screenshot" className="w-full rounded-xl max-h-[65vh] object-contain bg-black" />
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer className="border-t border-zinc-800 bg-zinc-950 py-4 px-4 text-center text-xs text-zinc-500">
+            <p>© 2026 Meta Cyber Recovery Bureau. Directed by <span className="text-pink-400">@_mitu_111_</span></p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
